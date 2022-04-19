@@ -1,117 +1,103 @@
 import { createAction, handleActions } from "redux-actions";
-import produce from "immer";
-import axios from "axios";
+import { produce } from "immer";
+import axiosInstance from "../../shared/request";
+import { RESP } from "../../response";
+import { actionCreators2 } from "./post";
 
-// action type
-const ADD_COMMENT = "ADD_COMMENT";
-const GET_COMMENT = "GET_COMMENT";
-const DELETE = "DELETE";
-
-// action creator
-const addComment = createAction(ADD_COMMENT, (user) => ({ user }));
-const getComment = createAction(GET_COMMENT, (comment) => ({ comment }));
-const deleteComment = createAction(DELETE, (commentInfo) => ({ commentInfo }));
-
-
-const initialState = {
-    list: []
+//action
+const GETCOMMENT = "getComment";
+const ADDCOMMENT = "addComment";
+const DELETECOMMENT = "deleteComment";
+//init
+const init = {
+    list: [],
 };
 
-// middleWare
-const addCommentSP = (postId, comment, token) => {
-    return function (dispatch, getState) {
+//action creators
+const getComment = createAction(GETCOMMENT, (comment_list) => ({
+    comment_list,
+}));
+const addComment = createAction(ADDCOMMENT, (comment) => ({ comment }));
+const deleteComment = createAction(DELETECOMMENT, () => ({}));
 
-        console.log(comment)
-        axios
-            .post(
-                `http://3.38.162.11:8080/api/comment/${postId}`,
-                {
-                    token,
-                    comment: comment,
-                }, {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                    },
-                }
-            )
-            .then((res) => {
-                console.log(res);
-                // dispatch(addComment);
-            })
-            .catch((err) => {
-                console.log(err)
+//middleware
+const getCommentDB = (postId) => {
+    return async function (dispatch, getState, { history }) {
+        try {
+            const response = await axiosInstance.get(`/api/comment/${postId}`);
+            // const response = RESP.COMMENTPOSTIDGET;
+            console.log(response);
+            dispatch(getComment(response.data));
+        } catch (err) {
+            console.log(err);
+        }
+    };
+};
+const MaddCommentDB = (postId, comment) => {
+    return async function (dispatch, getState, { history }) {
+        console.log(postId, comment);
+        try {
+            const response = await axiosInstance.post(`/api/comment/${postId}`, {
+                comment,
             });
+            // const response = RESP.COMMENTPOSTIDPOST;
+            console.log(response);
+
+            if (response.status === 200) {
+                dispatch(actionCreators2.commentMaintoPost({ postId, comment }));
+            }
+        } catch (err) {
+            console.log(err);
+        }
+    };
+};
+const addCommentDB = (postId, comment) => {
+    return async function (dispatch, getState, { history }) {
+        try {
+            const response = await axiosInstance.post(`/api/comment/${postId}`, {
+                comment,
+            });
+            // const response = RESP.COMMENTPOSTIDPOST;
+
+            if (response.status === 200) {
+                dispatch(getCommentDB(postId));
+            }
+        } catch (err) {
+            console.log(err);
+        }
+    };
+};
+const deleteCommentDB = (commentId, postId) => {
+    return async function (dispatch, getState, { history }) {
+        const response = await axiosInstance.delete(`/api/comment/${commentId}`);
+        // const response = RESP.COMMENTCOMMENTIDDELETE;
+        if ((response.status = 200)) {
+            window.alert("댓글이 삭제되었습니다.");
+            dispatch(getCommentDB(postId));
+        }
     };
 };
 
-const getCommentSP = (postId, token) => {
-    return function (dispatch) {
-        axios
-            .get(`http://3.38.162.11:8080/api/comment/${postId}`, {
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                },
-            })
-            .then((res) => {
-                const post = res.data;
-                dispatch(getComment(post));
-                console.log(post)
-            })
-            .catch((err) => {
-                console.log(err);
-            });
-    };
-};
-
-const deleteCommentSP = (commentId, token) => {
-    return function (dispatch) {
-        axios
-            .delete(`http://3.38.162.11:8080/api/comment/${commentId}`, {
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                },
-            })
-            .then((res) => {
-                dispatch(deleteComment(commentId));
-            })
-            .catch((err) => {
-                console.log(err);
-            });
-    };
-};
-
-// reducer
+//reducer
 export default handleActions(
     {
-        [ADD_COMMENT]: (state, action) => produce(state, (draft) => {
-                draft.comment.unshift(action.payload.user);
+        [GETCOMMENT]: (state, action) =>
+            produce(state, (draft) => {
+                draft.list = action.payload.comment_list;
             }),
-        [GET_COMMENT]: (state, action) => produce(state, (draft) => {
-                // console.log(action.payload.comment);
-                draft.comment = action.payload.comment;
+        [ADDCOMMENT]: (state, action) =>
+            produce(state, (draft) => {
+                draft.list.push(action.payload.comment);
             }),
-        [DELETE]: (state, action) => produce(state, (draft) => {
-                // console.log(state.comment);
-                const index = state.comment.indexOf(action.payload.commentInfo);
-                // console.log(draft.comment);
-                draft.comment.splice(index, 1);
-            }),
-        // [NEW_COMMENT]: (state, action) => produce(state, (draft) => {
-        //     let idx = draft.list.findIndex(
-        //         (p) => p.postId === action.payload.postId
-        //     );
-        //     draft.list[idx].commentList.push("count를위해추가");
-        //     // console.log(draft.list[idx])
-        //     // console.log(state.list[idx]); // 위치 체크용 state.
-        // }),
     },
-    initialState
+    init
 );
 
-const actionCreators = {
-    addCommentSP,
-    getCommentSP,
-    deleteCommentSP,
+const actionCreators3 = {
+    getComment,
+    getCommentDB,
+    MaddCommentDB,
+    addCommentDB,
+    deleteCommentDB,
 };
-
-export { actionCreators };
+export { actionCreators3 };

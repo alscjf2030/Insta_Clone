@@ -1,190 +1,276 @@
 import { createAction, handleActions } from "redux-actions";
-import produce from "immer";
-import axios from "axios";
-import moment from "moment";
+import { produce } from "immer";
+import axiosInstance from "../../shared/request";
+import { RESP } from "../../response";
 
-const SET_POST = "SET_POST";
-const ADD_POST = "ADD_POST";
-const EDIT_POST = "EDIT_POST";
-const DELETE_POST = "DELETE_POST";
-const GET_DETAIL = "GET_DETAIL";
-const IS_LIKE = "IS_LIKE";
-const NEW_COMMENT = "NEW_COMMENT";
+//action
+const GETFIRSTPOST = "getFirstPost";
+const GETNEXTPOST = "getNextPost";
+const POSTLIKE = "postLike";
+const DETAILPOSTLIKE = "detailPostLike";
+const LOADING = "loading";
+const POSTPREVIEW = "postPreview";
 
-// action type
-const setPost = createAction(SET_POST, (post_list) => ({ post_list }));
-const addPost = createAction(ADD_POST, (post_list) => ({ post_list }));
-const editPost = createAction(EDIT_POST, (image, content, postId) => ({
-    image,
-    content,
-    postId,
-}));
-const deletePost = createAction(DELETE_POST, (post) => ({ post }));
-const like = createAction(IS_LIKE, (postId, userId) => ({ postId, userId }));
+const UPLOADPOST = "uploadPost";
+const GETDETAILPOST = "getDetailPost";
+const DELETEPOST = "deletePost";
+const EDITPOST = "editPost";
+const COMMENT_MAINTOPOST = "commentMainToPost";
 
-
+//init
 const initialState = {
     list: [],
-    detail: false,
+    paging: { start: null, next: null, lastPage: false },
+    is_loading: false,
 };
 
-const initialPost = {
-    content: "",
-    imgUrl:
-        "https://newsimg.hankookilbo.com/cms/articlerelease/2021/06/05/ef519975-80c8-40b6-b25a-47ab6270dc60.png",
-    postDate: moment().format("YYYY-MM-DD"),
-    title: "",
-    // uid: "키값",
-    // userId:"값",
-    area: "",
-};
+//action creators
+const getFirstPost = createAction(GETFIRSTPOST, (post_list, paging) => ({
+    post_list,
+    paging,
+}));
+const getNextPost = createAction(GETNEXTPOST, (post_list, paging) => ({
+    post_list,
+    paging,
+}));
+const postLike = createAction(POSTLIKE, (post) => ({ post }));
+const detailPostLike = createAction(DETAILPOSTLIKE, (clicked) => ({ clicked }));
+const loading = createAction(LOADING, (is_loading) => ({ is_loading }));
+const postPreview = createAction(POSTPREVIEW, (preview) => ({ preview }));
+const uploadPost = createAction(UPLOADPOST, () => ({}));
+const getDetailPost = createAction(GETDETAILPOST, (post) => ({ post }));
+const deletePost = createAction(DELETEPOST, () => ({}));
+const editPost = createAction(EDITPOST, (content) => ({ content }));
+const commentMaintoPost = createAction(COMMENT_MAINTOPOST, (comment) => ({
+    comment,
+}));
 
-const addPostDB = (image, content, token, navigate) => {
-    return function (dispatch, getState) {
-
-        console.log(image)
-        console.log(content)
-
-        const frm = new FormData();
-        frm.append("image", image);
-        frm.append("content", content);
-
-        axios
-            .post("http://3.38.162.11:8080/api/post", frm, {
-                headers: {
-                    "content-type": "multipart/form-data",
-                    Authorization: `Bearer ${token}`,
-                },
-            })
-            .then((res) => {
-                // let postList = res.data;
-                console.log(res.data)
-                // navigate("/");
-                // dispatch(addPost(postList));
-            })
-            .catch((err) => {
-                alert("이미지를 추가해 주세요");
-                console.log(err.response);
+//middlewares
+const getFirstPostDB = (nickName) => {
+    console.log("난 getFirstPostDB다", nickName);
+    return async function (dispatch, getState, { history }) {
+        try {
+            dispatch(loading(true));
+            const response = await axiosInstance.post("/api/posts", {
+                nickName,
+                page: 1,
             });
+            let paging = {
+                start: 2,
+                next: 3,
+                lastPage: response.data.last,
+            };
+            if (response.status === 200) {
+                dispatch(getFirstPost(response.data.content, paging));
+            }
+        } catch (err) {
+            console.log(err);
+        }
     };
 };
 
-
-const editPostDB = (image, content, postId, token, navigate) => {
-    return function (dispatch, getState,) {
-
-        const frm = new FormData();
-        frm.append("content", content);
-
-        axios
-            .put(`http://3.38.162.11:8080/api/posts/${postId}`, frm, {
-                headers: {
-                    "content-type": "multipart/form-data",
-                    Authorization: `Bearer ${token}`,
-                },
-            })
-            .then((res) => {
-                console.log(res.data)
-                // navigate("/");
-                // dispatch(editPost(content, postId));
-            })
-            .catch((err) => {
-                console.log(err);
+const getNextPostDB = (nickName, page) => {
+    return async function (dispatch, getState, { history }) {
+        try {
+            dispatch(loading(true));
+            const response = await axiosInstance.post("/api/posts", {
+                nickName,
+                page,
             });
+            // const response = RESP.POSTSPOST;
+            console.log(response);
+            let paging = {
+                start: page + 1,
+                next: page + 2,
+                lastPage: response.data.last,
+            };
+
+            if (response.status === 200) {
+                dispatch(getNextPost(response.data.content, paging));
+            }
+        } catch (err) {
+            console.log(err);
+        }
+    };
+};
+const postLikeDB = (postId) => {
+    return async function (dispatch, getState, { history }) {
+        console.log("난 postLikeDB야");
+        const response = await axiosInstance.post(`/api/likes/${postId}`);
+        // const response = RESP.LIKEPOSTIDPOST;
+        console.log(response);
+        if (response.status === 200) {
+            dispatch(
+                postLike({
+                    postId,
+                    clicked: response.data.clicked,
+                })
+            );
+        }
+    };
+};
+const detailPostLikeDB = (postId) => {
+    return async function (dispatch, getState, { history }) {
+        const response = await axiosInstance.post(`/api/likes/${postId}`);
+        // const response = RESP.LIKEPOSTIDPOST;
+        console.log(response);
+        dispatch(detailPostLike(response.data.clicked));
+    };
+};
+const uploadPostDB = (formdata, config) => {
+    return async function (dispatch, getState, { history }) {
+        try {
+            const response = await axiosInstance.post("/api/post", formdata, config);
+            console.log(response);
+            // const response = RESP.POSTPOST;
+            if (response.data.status === 200) {
+                window.alert("게시물이 작성되었습니다.");
+                dispatch(uploadPost());
+                history.replace("/home");
+            }
+        } catch (err) {
+            console.log(err);
+        }
+    };
+};
+const getDetailPostDB = (postId) => {
+    return async function (dispatch, getState, { history }) {
+        const user = getState().user.user;
+        console.log(user);
+        try {
+            const response = await axiosInstance.post("/api/post/detail", {
+                postId,
+                nickName: user.nickName,
+            });
+            console.log(response);
+            // const response = RESP.POSTDETAILPOST;
+            dispatch(getDetailPost(response.data));
+        } catch (err) {
+            console.log(err);
+        }
+    };
+};
+const deletePostDB = (postId) => {
+    return async function (dispatch, getState, { history }) {
+        try {
+            const response = await axiosInstance.delete(`/api/post/${postId}`);
+            // const response = RESP.POSTPOSTIDDELETE;
+            if (response.status === 200) {
+                window.alert("게시물이 삭제되었습니다.");
+                history.replace("/home");
+            }
+        } catch (err) {
+            console.log(err);
+        }
+    };
+};
+const editPostDB = (postId, content) => {
+    return async function (dispatch, getState, { history }) {
+        try {
+            console.log(postId, content);
+            const response = await axiosInstance.put(`/api/post/${postId}`, {
+                content,
+            });
+            // const response = RESP.POSTPOSTIDPUT;
+            if (response.status === 200) {
+                window.alert("게시물이 수정되었습니다.");
+                history.replace(`/detail/${postId}`);
+            }
+        } catch (err) {
+            console.log(err);
+        }
     };
 };
 
-const deletePostDB = (postId, token, navigate) => {
-    return function (dispatch, getState) {
-
-        axios
-            .delete(`http://3.38.162.11:8080/api/posts/${postId}`, {
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                },
-            })
-            .then((res) => {
-                console.log(res.data)
-                // navigate("/");
-                // dispatch(deletePost(postId));
-            })
-            .catch((err) => {
-                console.log(err);
-            });
-    };
-};
-
-const likePost = (postId, token, userId) => {
-    return function (dispatch, getState) {
-
-        axios
-            .post(
-                `/api/likes/${postId}`,
-                {},
-                {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                    },
-                }
-            )
-            .then((response) => {
-                dispatch(like(postId, userId));
-            });
-    };
-};
-
-// reducer
+//reducer
 export default handleActions(
     {
-        [SET_POST]: (state, action) => produce(state, (draft) => {
+        [GETFIRSTPOST]: (state, action) =>
+            produce(state, (draft) => {
+                // draft.list.push(...action.payload.post_list);
                 draft.list = action.payload.post_list;
+                draft.paging = action.payload.paging;
+                draft.is_loading = false;
             }),
-        [ADD_POST]: (state, action) => produce(state, (draft) => {
-                draft.list.unshift(action.payload.post_list);
-                // draft.list = action.payload.post;
+        [GETNEXTPOST]: (state, action) =>
+            produce(state, (draft) => {
+                draft.list.push(...action.payload.post_list);
+                // draft.list = action.payload.post_list;
+                draft.paging = action.payload.paging;
+                draft.is_loading = false;
             }),
-
-        [EDIT_POST]: (state, action) => produce(state, (draft) => {
-                let index = draft.list.findIndex(
-                    (l) => l.postId === action.payload.postId
-                );
-                draft.list[index] = {
-                    ...draft.list[index],
-                    ...action.payload.new_post,
-                };
+        [DETAILPOSTLIKE]: (state, action) =>
+            produce(state, (draft) => {
+                console.log(action.payload.clicked);
+                if (action.payload.clicked) {
+                    draft.detailPost.likeCnt += 1;
+                    draft.detailPost.clicked = true;
+                } else if (!action.payload.clicked) {
+                    draft.detailPost.likeCnt -= 1;
+                    draft.detailPost.clicked = false;
+                }
             }),
-        [DELETE_POST]: (state, action) => produce(state, (draft) => {
-                let new_post_list = draft.list.filter((target) => {
-                    if (target.postId !== action.payload.post) {
-                        return target;
+        [POSTLIKE]: (state, action) =>
+            produce(state, (draft) => {
+                console.log(action.payload.post);
+                if (action.payload.post.clicked === true) {
+                    draft.list.map((post) => {
+                        if (post.postId === action.payload.post.postId) {
+                            post.clicked = true;
+                            post.likeCnt += 1;
+                        }
+                    });
+                } else if (action.payload.post.clicked === false) {
+                    draft.list.map((post) => {
+                        if (post.postId === action.payload.post.postId) {
+                            post.clicked = false;
+                            post.likeCnt -= 1;
+                        }
+                    });
+                }
+            }),
+        [LOADING]: (state, action) =>
+            produce(state, (draft) => {
+                draft.is_loading = action.payload.is_loading;
+            }),
+        [POSTPREVIEW]: (state, action) =>
+            produce(state, (draft) => {
+                draft.preview = action.payload.preview;
+            }),
+        [UPLOADPOST]: (state, action) =>
+            produce(state, (draft) => {
+                draft.preview = null;
+            }),
+        [GETDETAILPOST]: (state, action) =>
+            produce(state, (draft) => {
+                draft.detailPost = action.payload.post;
+            }),
+        [COMMENT_MAINTOPOST]: (state, action) =>
+            produce(state, (draft) => {
+                draft.list.map((p) => {
+                    console.log(p.postId, action.payload.comment.postId);
+                    if (p.postId === action.payload.comment.postId) {
+                        p.commnetCnt += 1;
                     }
                 });
-                draft.list = new_post_list;
-            }),
-        [IS_LIKE]: (state, action) => produce(state, (draft) => {
-                let idx = draft.list.findIndex(
-                    (p) => p.postId === action.payload.postId
-                );
-                let likeIndex = draft.list[idx].likeList.findIndex(
-                    (p) => p.userId === action.payload.userId
-                );
-
-                const is_like = { userId: action.payload.userId };
-                likeIndex === -1
-                    ? draft.list[idx].likeList.push(is_like)
-                    : draft.list[idx].likeList.splice(likeIndex);
             }),
     },
     initialState
 );
 
-
-const actionCreators = {
-    setPost,
-    addPostDB,
-    editPostDB,
+const actionCreators2 = {
+    getFirstPost,
+    getFirstPostDB,
+    getNextPostDB,
+    postLikeDB,
+    postPreview,
+    uploadPostDB,
+    uploadPost,
+    getDetailPostDB,
+    detailPostLikeDB,
     deletePostDB,
-    likePost,
+    editPostDB,
+    commentMaintoPost,
 };
 
-export { actionCreators };
+export { actionCreators2 };
